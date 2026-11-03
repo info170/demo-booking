@@ -21,9 +21,31 @@ class StoreBookingRequest extends FormRequest
     {
         return [
             'room_id' => ['required', 'integer', 'exists:rooms,id'],
-            'starts_at' => ['required', 'date'],
-            'ends_at' => ['required', 'date', 'after:starts_at'],
+            'starts_at' => ['required', 'date', 'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/'],
+            'ends_at' => ['required', 'date', 'after:starts_at', 'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/'],
             'title' => ['required', 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'room_id.required' => 'Укажите комнату.',
+            'room_id.integer' => 'Идентификатор комнаты должен быть целым числом.',
+            'room_id.exists' => 'Указанная комната не существует.',
+            'starts_at.required' => 'Укажите время начала бронирования.',
+            'starts_at.date' => 'Время начала имеет неверный формат.',
+            'starts_at.regex' => 'Время начала должно быть в формате ISO 8601 со смещением часового пояса.',
+            'ends_at.required' => 'Укажите время окончания бронирования.',
+            'ends_at.date' => 'Время окончания имеет неверный формат.',
+            'ends_at.after' => 'Время окончания должно быть позже времени начала.',
+            'ends_at.regex' => 'Время окончания должно быть в формате ISO 8601 со смещением часового пояса.',
+            'title.required' => 'Укажите название бронирования.',
+            'title.string' => 'Название бронирования должно быть строкой.',
+            'title.max' => 'Название бронирования не должно превышать 255 символов.',
         ];
     }
 

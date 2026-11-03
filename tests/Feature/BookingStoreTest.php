@@ -80,6 +80,30 @@ class BookingStoreTest extends TestCase
             ->assertJsonValidationErrors('starts_at');
     }
 
+    public function test_requires_iso8601_datetime_with_timezone_offset(): void
+    {
+        [$user, $room] = $this->authenticatedRoom();
+        $payload = $this->payload($room, '10:00', '11:00');
+        $payload['starts_at'] = '2026-11-02 10:00:00';
+        $payload['ends_at'] = '2026-11-02 11:00:00';
+
+        $this->postJson('/api/bookings', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['starts_at', 'ends_at']);
+    }
+
+    public function test_accepts_iso8601_datetime_with_timezone_offset(): void
+    {
+        [$user, $room] = $this->authenticatedRoom();
+
+        $this->postJson('/api/bookings', [
+            'room_id' => $room->id,
+            'title' => 'Планёрка',
+            'starts_at' => '2026-11-02T10:00:00+03:00',
+            'ends_at' => '2026-11-02T11:00:00+03:00',
+        ])->assertCreated();
+    }
+
     public function test_checks_working_hours_in_office_timezone(): void
     {
         [$user, $room] = $this->authenticatedRoom(Office::factory()->novosibirsk()->create());
