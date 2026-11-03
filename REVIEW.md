@@ -80,7 +80,13 @@
 
 <u>Как исправить:</u> добавить with (жадную загрузку) `return $room->bookings()->with('user')`
 
-#### 3.5 Желательно запросы без RAW
+#### 3.5 Неоднозначное условие запроса
+
+В `today()` в запросе `whereDate('starts_at', today())` время может быть неточным.
+
+<u>Как исправить:</u> использовать диапазон `->whereBetween('starts_at', [today(), today()->endOfDay()])`
+
+#### 3.6 Желательно запросы без RAW
 
 `BookingController::index`
 
@@ -88,7 +94,7 @@
 
 <u>Как исправить:</u> заменить на orderByDesc('starts_at')
 
-#### 3.6 Миграции без timezone
+#### 3.7 Миграции без timezone
 
 В миграциях используется timestamp('starts_at') и timestamp('ends_at')
 
