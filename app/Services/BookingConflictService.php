@@ -7,12 +7,22 @@ use Carbon\Carbon;
 
 class BookingConflictService
 {
-    public function hasConflict(int $roomId, string $startsAt, string $endsAt): bool
+    public function hasConflict(
+        int $roomId,
+        string $startsAt,
+        string $endsAt,
+        bool $lock = false,
+    ): bool
     {
-        $firstList = Booking::query()
+        $query = Booking::query()
             ->where('room_id', $roomId)
-            ->orderBy('starts_at')
-            ->get(['starts_at', 'ends_at'])
+            ->orderBy('starts_at');
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $firstList = $query->get(['starts_at', 'ends_at'])
             ->map(fn (Booking $booking): array => [
                 $this->databaseTimestamp($booking->starts_at->format('Y-m-d H:i:s')),
                 $this->databaseTimestamp($booking->ends_at->format('Y-m-d H:i:s')),

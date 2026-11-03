@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Room;
 use App\Services\BookingConflictService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class BookingController extends Controller
@@ -26,18 +27,25 @@ class BookingController extends Controller
     {
         $validated = $request->validated();
 
-        if ($this->bookingConflictService->hasConflict(
-            $validated['room_id'],
-            $validated['starts_at'],
-            $validated['ends_at'],
-        )) {
+        $booking = DB::transaction(function () use ($request, $validated): ?Booking {
+            if ($this->bookingConflictService->hasConflict(
+                $validated['room_id'],
+                $validated['starts_at'],
+                $validated['ends_at'],
+                true,
+            )) {
+                return null;
+            }
+
+            return Booking::create([
+                ...$validated,
+                'user_id' => $request->user()->id,
+            ]);
+        });
+
+        if ($booking === null) {
             return response()->json(['error' => 'Комната занята'], 409);
         }
-
-        $booking = Booking::create([
-            ...$validated,
-            'user_id' => $request->user()->id,
-        ]);
 
         Log::withContext(['booking_id' => $booking->id]);
         Log::channel('bookings')->info('Booking created');
