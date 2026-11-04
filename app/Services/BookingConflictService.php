@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Booking;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class BookingConflictService
 {
@@ -12,10 +13,15 @@ class BookingConflictService
         string $startsAt,
         string $endsAt,
         bool $lock = false,
-    ): bool
-    {
+    ): bool {
+        if ($lock && DB::connection()->getDriverName() === 'pgsql') {
+            DB::select('select pg_advisory_xact_lock(?)', [$roomId]);
+        }
+
         $query = Booking::query()
             ->where('room_id', $roomId)
+            ->where('starts_at', '<', $endsAt)
+            ->where('ends_at', '>', $startsAt)
             ->orderBy('starts_at');
 
         if ($lock) {
@@ -38,8 +44,8 @@ class BookingConflictService
     }
 
     /**
-     * @param array<int, array{0: int, 1: int}> $firstList
-     * @param array<int, array{0: int, 1: int}> $secondList
+     * @param  array<int, array{0: int, 1: int}>  $firstList
+     * @param  array<int, array{0: int, 1: int}>  $secondList
      * @return array<int, array{0: int, 1: int}>
      */
     public function intervalIntersection(array $firstList, array $secondList): array
@@ -74,10 +80,8 @@ class BookingConflictService
 
     private function databaseTimestamp(string $value): int
     {
-        return Carbon::createFromFormat(
-            'Y-m-d H:i:s',
-            Carbon::parse($value)->format('Y-m-d H:i:s'),
-            'UTC',
-        )->timestamp;
+        return Carbon::parse($value)
+            ->utc()
+            ->timestamp;
     }
 }

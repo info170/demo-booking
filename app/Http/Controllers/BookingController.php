@@ -6,15 +6,14 @@ use App\Http\Requests\StoreBookingRequest;
 use App\Models\Booking;
 use App\Models\Room;
 use App\Services\BookingConflictService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class BookingController extends Controller
 {
-    public function __construct(private BookingConflictService $bookingConflictService)
-    {
-    }
+    public function __construct(private BookingConflictService $bookingConflictService) {}
 
     public function index(Request $request)
     {
@@ -26,6 +25,8 @@ class BookingController extends Controller
     public function store(StoreBookingRequest $request)
     {
         $validated = $request->validated();
+        $validated['starts_at'] = Carbon::parse($validated['starts_at'])->utc()->format('Y-m-d H:i:s');
+        $validated['ends_at'] = Carbon::parse($validated['ends_at'])->utc()->format('Y-m-d H:i:s');
 
         $booking = DB::transaction(function () use ($request, $validated): ?Booking {
             if ($this->bookingConflictService->hasConflict(
@@ -70,7 +71,7 @@ class BookingController extends Controller
             ->whereDate('starts_at', today())
             ->get()
             ->map(fn ($b) => [
-                'time' => $b->starts_at . ' – ' . $b->ends_at,
+                'time' => $b->starts_at.' – '.$b->ends_at,
                 'author' => $b->user->name,
             ]);
     }
