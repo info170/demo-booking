@@ -30,4 +30,11 @@ class BookingIndexTest extends TestCase
     {
         $this->getJson('/api/bookings')->assertUnauthorized();
     }
+
+    public function test_requires_authentication_without_accept_header(): void
+    {
+        $this->get('/api/bookings')
+            ->assertUnauthorized()
+            ->assertExactJson(['message' => 'Unauthenticated.']);
+    }
 }

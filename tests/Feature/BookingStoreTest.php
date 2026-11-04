@@ -43,12 +43,25 @@ class BookingStoreTest extends TestCase
     {
         [$user, $room] = $this->authenticatedRoom();
         Booking::factory()->for($room)->create([
-            'starts_at' => '2026-11-02 10:00:00',
-            'ends_at' => '2026-11-02 11:00:00',
+            'starts_at' => '2026-11-02 07:00:00',
+            'ends_at' => '2026-11-02 08:00:00',
         ]);
 
         $this->postJson('/api/bookings', $this->payload($room, '10:30', '11:30'))
             ->assertStatus(409)
+            ->assertJsonPath('error', 'Комната занята');
+    }
+
+    public function test_rejects_duplicate_slot_after_first_booking_is_committed(): void
+    {
+        [$user, $room] = $this->authenticatedRoom();
+        $payload = $this->payload($room, '10:00', '11:00');
+
+        $this->postJson('/api/bookings', $payload)
+            ->assertCreated();
+
+        $this->postJson('/api/bookings', $payload)
+            ->assertConflict()
             ->assertJsonPath('error', 'Комната занята');
     }
 
@@ -102,6 +115,84 @@ class BookingStoreTest extends TestCase
             'starts_at' => '2026-11-02T10:00:00+03:00',
             'ends_at' => '2026-11-02T11:00:00+03:00',
         ])->assertCreated();
+    }
+
+    public function test_accepts_utc_iso8601_datetime(): void
+    {
+        [$user, $room] = $this->authenticatedRoom();
+
+        $this->postJson('/api/bookings', [
+            'room_id' => $room->id,
+            'title' => 'Планёрка',
+            'starts_at' => '2026-11-02T07:00:00Z',
+            'ends_at' => '2026-11-02T08:00:00Z',
+        ])->assertCreated();
+    }
+
+    public function test_accepts_minimum_duration(): void
+    {
+        [$user, $room] = $this->authenticatedRoom();
+
+        $this->postJson('/api/bookings', $this->payload($room, '09:00', '09:15'))
+            ->assertCreated();
+    }
+
+    public function test_accepts_maximum_duration(): void
+    {
+        [$user, $room] = $this->authenticatedRoom();
+
+        $this->postJson('/api/bookings', $this->payload($room, '09:00', '13:00'))
+            ->assertCreated();
+    }
+
+    public function test_accepts_booking_at_working_hours_boundaries(): void
+    {
+        [$user, $room] = $this->authenticatedRoom();
+
+        $this->postJson('/api/bookings', $this->payload($room, '19:00', '20:00'))
+            ->assertCreated();
+    }
+
+    public function test_rejects_booking_ending_after_working_hours(): void
+    {
+        [$user, $room] = $this->authenticatedRoom();
+
+        $this->postJson('/api/bookings', $this->payload($room, '19:15', '20:15'))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('starts_at');
+    }
+
+    public function test_uses_authenticated_user_instead_of_request_user_id(): void
+    {
+        [$user, $room] = $this->authenticatedRoom();
+        $otherUser = User::factory()->create();
+
+        $this->postJson('/api/bookings', [
+            ...$this->payload($room, '10:00', '11:00'),
+            'user_id' => $otherUser->id,
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('bookings', [
+            'room_id' => $room->id,
+            'user_id' => $user->id,
+        ]);
+        $this->assertDatabaseMissing('bookings', [
+            'room_id' => $room->id,
+            'user_id' => $otherUser->id,
+        ]);
+    }
+
+    public function test_booking_author_can_cancel_booking(): void
+    {
+        $author = User::factory()->create();
+        $room = Room::factory()->create();
+        $booking = Booking::factory()->for($author)->for($room)->create();
+        Sanctum::actingAs($author);
+
+        $this->deleteJson('/api/bookings/'.$booking->id)
+            ->assertNoContent();
+
+        $this->assertDatabaseMissing('bookings', ['id' => $booking->id]);
     }
 
     public function test_checks_working_hours_in_office_timezone(): void
